@@ -23,6 +23,15 @@ const User = {
       });
     });
   },
+//Actualizar contrasena
+  updatePassword: (email, newPasswordHash) => {
+  return new Promise((resolve, reject) => {
+    db.run(`UPDATE users SET passwordHash = ? WHERE email = ?`, [newPasswordHash, email], function (err) {
+      if (err) return reject(err);
+      resolve(this.changes > 0); // true si se actualizó
+    });
+  });
+ },
 };
 
 module.exports = User;

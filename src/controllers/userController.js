@@ -31,6 +31,7 @@ exports.register = async (req, res) => {
   }
 };
 
+// Registro de Admin
 exports.createAdmin = async (req, res) => {
   try {
     const { nombre, apellidos, email, password } = req.body;
@@ -55,6 +56,30 @@ exports.createAdmin = async (req, res) => {
     res.status(500).json({ error: 'Error al registrar admin.', detalle: error.message });
   }
 };
+
+// Recuperar contrasena
+exports.recoverPassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: 'Correo y nueva contraseña requeridos.' });
+    }
+    const user = await User.findByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    const updated = await User.updatePassword(email, newPasswordHash);
+    if (!updated) {
+      return res.status(500).json({ error: 'No se pudo actualizar la contraseña.' });
+    }
+    res.json({ mensaje: 'Contraseña actualizada correctamente.' });
+  } catch (error) {
+    console.error('Error en recuperación de contraseña:', error);
+    res.status(500).json({ error: 'Error en recuperación de contraseña.' });
+  }
+};
+
 
 
 // Login 
