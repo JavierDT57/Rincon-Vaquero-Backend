@@ -2,6 +2,8 @@ require('dotenv').config();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const { sendWelcomeMail } = require('../services/sendMail');
+
 
 const JWT_SECRET = process.env.JWT_SECRET || 'cambialo_en_produccion';
 const SALT_ROUNDS = 10;
@@ -21,7 +23,7 @@ exports.register = (req, res) => {
       db.run(
         'INSERT INTO users (nombre, apellidos, email, passwordHash, rol, isActive) VALUES (?, ?, ?, ?, ?, ?)',
         [nombre, apellidos, email, hash, 'usuario', 1],
-        function (err) {
+        async function (err) {
           if (err) return res.status(500).json({ message: 'No se pudo crear el usuario' });
           const user = {
             id: this.lastID,
@@ -31,6 +33,15 @@ exports.register = (req, res) => {
             rol: 'usuario',
             isActive: 1
           };
+
+          // --- Envío de correo de bienvenida ---
+          try {
+            await sendWelcomeMail({ to: email, nombre });
+          } catch (e) {
+            console.error('No se pudo enviar el correo de bienvenida:', e);
+            // El registro sigue, solo se loguea el error
+          }
+
           res.status(201).json({ message: 'Usuario creado', user });
         }
       );
