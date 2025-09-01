@@ -1,118 +1,144 @@
+require('dotenv').config();
 const bcrypt = require('bcrypt');
-const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+const db = require('../config/db');
 
-// Registro de usuario normal 
-exports.register = async (req, res) => {
-  try {
-    const { nombre, apellidos, email, password } = req.body;
+const JWT_SECRET = process.env.JWT_SECRET || 'cambialo_en_produccion';
+const SALT_ROUNDS = 10;
 
-    if (!nombre || !apellidos || !email || !password) {
-      return res.status(400).json({ error: 'Todos los campos son obligatorios.' });
-    }
+// Registro de usuario
+exports.register = (req, res) => {
+  const { nombre, apellidos, email, password } = req.body;
+  if (!nombre || !apellidos || !email || !password)
+    return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
 
-    const existingUser = await User.findByEmail(email);
-    if (existingUser) {
-      return res.status(409).json({ error: 'El correo ya está registrado.' });
-    }
+  db.get('SELECT id FROM users WHERE email = ?', [email], (err, row) => {
+    if (err) return res.status(500).json({ message: 'Error en la base de datos' });
+    if (row) return res.status(409).json({ message: 'El correo ya está registrado.' });
 
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const newUser = await User.create({
-      nombre,
-      apellidos,
-      email,
-      passwordHash,
-      rol: "usuario" // <--- cree solo usuarios
+    bcrypt.hash(password, SALT_ROUNDS, (err, hash) => {
+      if (err) return res.status(500).json({ message: 'Error interno al hashear' });
+      db.run(
+        'INSERT INTO users (nombre, apellidos, email, passwordHash, rol, isActive) VALUES (?, ?, ?, ?, ?, ?)',
+        [nombre, apellidos, email, hash, 'usuario', 1],
+        function (err) {
+          if (err) return res.status(500).json({ message: 'No se pudo crear el usuario' });
+          const user = {
+            id: this.lastID,
+            nombre,
+            apellidos,
+            email,
+            rol: 'usuario',
+            isActive: 1
+          };
+          res.status(201).json({ message: 'Usuario creado', user });
+        }
+      );
     });
-
-    res.status(201).json({ mensaje: 'Usuario registrado exitosamente', user: newUser });
-  } catch (error) {
-    res.status(500).json({ error: 'Error al registrar usuario.' });
-  }
+  });
 };
 
-// Registro de Admin
-exports.createAdmin = async (req, res) => {
-  try {
-    const { nombre, apellidos, email, password } = req.body;
-    if (!nombre || !apellidos || !email || !password) {
-      return res.status(400).json({ error: 'Todos los campos son obligatorios.' });
-    }
-    const existingUser = await User.findByEmail(email);
-    if (existingUser) {
-      return res.status(409).json({ error: 'El correo ya está registrado.' });
-    }
-    const passwordHash = await bcrypt.hash(password, 10);
-    const newUser = await User.create({
-      nombre,
-      apellidos,
-      email,
-      passwordHash,
-      rol: "admin"
+// Crear admin (usa con Postman)
+exports.createAdmin = (req, res) => {
+  const { nombre, apellidos, email, password } = req.body;
+  if (!nombre || !apellidos || !email || !password)
+    return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
+
+  db.get('SELECT id FROM users WHERE email = ?', [email], (err, row) => {
+    if (err) return res.status(500).json({ message: 'Error en la base de datos' });
+    if (row) return res.status(409).json({ message: 'El correo ya está registrado.' });
+
+    bcrypt.hash(password, SALT_ROUNDS, (err, hash) => {
+      if (err) return res.status(500).json({ message: 'Error interno al hashear' });
+      db.run(
+        'INSERT INTO users (nombre, apellidos, email, passwordHash, rol, isActive) VALUES (?, ?, ?, ?, ?, ?)',
+        [nombre, apellidos, email, hash, 'admin', 1],
+        function (err) {
+          if (err) return res.status(500).json({ message: 'No se pudo crear el admin' });
+          const user = {
+            id: this.lastID,
+            nombre,
+            apellidos,
+            email,
+            rol: 'admin',
+            isActive: 1
+          };
+          res.status(201).json({ message: 'Admin creado', user });
+        }
+      );
     });
-    res.status(201).json({ mensaje: 'Admin registrado exitosamente', user: newUser });
-  } catch (error) {
-    console.error('Error al registrar admin:', error); 
-    res.status(500).json({ error: 'Error al registrar admin.', detalle: error.message });
-  }
+  });
 };
 
-// Recuperar contrasena
-exports.recoverPassword = async (req, res) => {
-  try {
-    const { email, newPassword } = req.body;
-    if (!email || !newPassword) {
-      return res.status(400).json({ error: 'Correo y nueva contraseña requeridos.' });
-    }
-    const user = await User.findByEmail(email);
-    if (!user) {
-      return res.status(404).json({ error: 'Usuario no encontrado.' });
-    }
-    const newPasswordHash = await bcrypt.hash(newPassword, 10);
-    const updated = await User.updatePassword(email, newPasswordHash);
-    if (!updated) {
-      return res.status(500).json({ error: 'No se pudo actualizar la contraseña.' });
-    }
-    res.json({ mensaje: 'Contraseña actualizada correctamente.' });
-  } catch (error) {
-    console.error('Error en recuperación de contraseña:', error);
-    res.status(500).json({ error: 'Error en recuperación de contraseña.' });
-  }
-};
+// Login
+exports.login = (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password)
+    return res.status(400).json({ message: 'Correo y contraseña requeridos' });
 
-
-
-// Login 
-exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Correo y contraseña requeridos.' });
-    }
-
-    const user = await User.findByEmail(email);
-    if (!user) {
-      return res.status(401).json({ error: 'Credenciales inválidas.' });
-    }
-
-    const validPassword = await bcrypt.compare(password, user.passwordHash);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Credenciales inválidas.' });
-    }
-
-    res.json({
-      mensaje: 'Login exitoso',
-      user: {
-        id: user.id,
-        nombre: user.nombre,
-        apellidos: user.apellidos,
-        email: user.email,
-        rol: user.rol
+  db.get(
+    'SELECT id, nombre, apellidos, email, passwordHash, rol, isActive FROM users WHERE email = ?',
+    [email],
+    (err, user) => {
+      if (err) {
+        console.error('Error en login:', err);
+        return res.status(500).json({ message: 'Error en la base de datos' });
       }
-    });
-  } catch (error) {
-    console.error('Error al registrar admin:', error); 
-    res.status(500).json({ error: 'Error al registrar admin.', detalle: error.message });
-  }
+      if (!user) return res.status(401).json({ message: 'Usuario o contraseña inválidos' });
+      if (!user.isActive) return res.status(403).json({ message: 'Usuario inactivo' });
+
+      bcrypt.compare(password, user.passwordHash, (err, valid) => {
+        if (err) return res.status(500).json({ message: 'Error interno' });
+        if (!valid) return res.status(401).json({ message: 'Usuario o contraseña inválidos' });
+
+        const payload = {
+          id: user.id,
+          email: user.email,
+          rol: user.rol,
+          nombre: user.nombre,
+          apellidos: user.apellidos
+        };
+        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+
+        res.cookie('token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
+        res.json({
+          message: 'Login exitoso',
+          user: {
+            id: user.id,
+            nombre: user.nombre,
+            apellidos: user.apellidos,
+            email: user.email,
+            rol: user.rol
+          }
+        });
+      });
+    }
+  );
+};
+
+// Logout
+exports.logout = (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  });
+  res.json({ message: 'Logout exitoso' });
+};
+
+// Ruta protegida /me
+exports.me = (req, res) => {
+  if (!req.user) return res.status(401).json({ message: 'No autenticado' });
+  res.json({ user: req.user });
+};
+
+// Recuperar contraseña (stub)
+exports.recoverPassword = (req, res) => {
+  res.status(501).json({ message: 'Recuperación de contraseña no implementada aquí.' });
 };
