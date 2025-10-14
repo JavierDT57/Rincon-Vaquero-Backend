@@ -52,6 +52,19 @@ const Testimonio = {
       );
     });
   },
+  updateById: (id, { comentario, fecha, imagenurl, localidad, nombre, rating }) => {
+  return new Promise((resolve, reject) => {
+    const sql = `
+      UPDATE testimonios
+      SET comentario = ?, fecha = ?, imagen_url = ?, localidad = ?, nombre = ?, rating = ?
+      WHERE id = ?
+    `;
+    db.run(sql, [comentario, fecha, imagenurl, localidad, nombre, rating, id], function (err) {
+      if (err) return reject(err);
+      resolve(this.changes > 0); // true si actualizó algo
+    });
+  });
+},
 
   deleteById: (id) => {
     return new Promise((resolve, reject) => {
@@ -62,5 +75,6 @@ const Testimonio = {
     });
   }
 };
+
 
 module.exports = Testimonio;

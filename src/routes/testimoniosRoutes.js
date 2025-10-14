@@ -4,8 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
-const { crearTestimonio, listarTestimonios, obtenerTestimonio, eliminarTestimonio } = require('../controllers/testimoniosController');
-
+const { crearTestimonio, listarTestimonios, obtenerTestimonio, eliminarTestimonio, editarTestimonio } = require('../controllers/testimoniosController');
 const router = express.Router();
 
 // asegurar carpeta destino
@@ -32,6 +31,7 @@ const upload = multer({ storage, fileFilter, limits: { fileSize: 15 * 1024 * 102
 router.get('/', listarTestimonios);                                    // GET    /api/testimonios
 router.get('/:id', obtenerTestimonio);                                 // GET    /api/testimonios/:id
 router.post('/', upload.single('imagenurl'), crearTestimonio);         // POST   /api/testimonios
+router.put('/:id', upload.single('imagenurl'), editarTestimonio); // PUT /api/testimonios/:id
 router.delete('/:id', eliminarTestimonio);                             // DELETE /api/testimonios/:id
 
 module.exports = router;

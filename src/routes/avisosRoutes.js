@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
-const { crearAviso, listarAvisos, obtenerAviso, eliminarAviso } = require('../controllers/avisosController');
+const { crearAviso, listarAvisos, obtenerAviso, eliminarAviso, editarAviso } = require('../controllers/avisosController');
 
 const router = express.Router();
 
@@ -35,6 +35,7 @@ const upload = multer({ storage, fileFilter, limits: { fileSize: 15 * 1024 * 102
 router.get('/', listarAvisos);                         // GET  /api/avisos
 router.get('/:id', obtenerAviso);                      // GET  /api/avisos/:id
 router.post('/', upload.single('imagen'), crearAviso); // POST /api/avisos  (campo archivo: imagen)
+router.put('/:id', upload.single('imagen'), editarAviso); // PUT /api/avisos/:id
 router.delete('/:id', eliminarAviso);                  // DELETE /api/avisos/:id
 
 module.exports = router;

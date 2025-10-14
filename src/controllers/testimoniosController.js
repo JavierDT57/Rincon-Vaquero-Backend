@@ -95,3 +95,82 @@ exports.eliminarTestimonio = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.editarTestimonio = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const { comentario, localidad, nombre, rating, fecha, imagenurl: imagenurlFromBody } = req.body || {};
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ ok: false, error: 'ID inválido' });
+    }
+
+    const actual = await Testimonio.getById(id);
+    if (!actual) return res.status(404).json({ ok: false, error: 'No encontrado' });
+
+    // Mantener imagen actual salvo que llegue una nueva (archivo o URL)
+    let imagenurl = actual.imagenurl;
+
+    if (req.file) {
+      // borrar anterior si era local
+      if (actual.imagenurl && actual.imagenurl.startsWith('/uploads/testimonios/')) {
+        const oldPath = path.resolve(__dirname, '../../', actual.imagenurl.replace(/^\//, ''));
+        try { await fs.promises.unlink(oldPath); } catch (_) {}
+      }
+      imagenurl = `/uploads/testimonios/${req.file.filename}`;
+    } else if (typeof imagenurlFromBody === 'string' && imagenurlFromBody.trim() !== '') {
+      imagenurl = imagenurlFromBody.trim();
+    }
+
+    // Mantener valores si no se mandan
+    const nuevoComentario = (typeof comentario === 'string' && comentario.trim() !== '') ? comentario.trim() : actual.comentario;
+    const nuevaLocalidad  = (typeof localidad  === 'string' && localidad.trim()  !== '') ? localidad.trim()  : actual.localidad;
+    const nuevoNombre     = (typeof nombre     === 'string' && nombre.trim()     !== '') ? nombre.trim()     : actual.nombre;
+
+    let nuevoRating = actual.rating;
+    if (typeof rating !== 'undefined') {
+      const r = parseInt(rating, 10);
+      if (!Number.isInteger(r) || r < 1 || r > 5) {
+        return res.status(400).json({ ok: false, error: 'rating debe ser un entero entre 1 y 5' });
+      }
+      nuevoRating = r;
+    }
+
+    let nuevaFecha = actual.fecha;
+    if (typeof fecha === 'string' && fecha.trim() !== '') {
+      const d = new Date(fecha);
+      if (Number.isNaN(d.getTime())) {
+        return res.status(400).json({ ok: false, error: 'fecha inválida' });
+      }
+      nuevaFecha = d.toISOString();
+    }
+
+    const actualizado = await Testimonio.updateById(id, {
+      comentario: nuevoComentario,
+      fecha: nuevaFecha,
+      imagenurl,
+      localidad: nuevaLocalidad,
+      nombre: nuevoNombre,
+      rating: nuevoRating
+    });
+
+    if (!actualizado) {
+      return res.status(500).json({ ok: false, error: 'No se pudo actualizar el testimonio' });
+    }
+
+    res.json({
+      ok: true,
+      data: {
+        id,
+        comentario: nuevoComentario,
+        fecha: nuevaFecha,
+        imagenurl,
+        localidad: nuevaLocalidad,
+        nombre: nuevoNombre,
+        rating: nuevoRating
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};

@@ -100,3 +100,50 @@ exports.eliminarAviso = async (req, res, next) => {
   }
 };
 
+exports.editarAviso = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const { titulo, texto } = req.body || {};
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ ok: false, error: 'ID inválido' });
+    }
+
+    const aviso = await Aviso.getById(id);
+    if (!aviso) return res.status(404).json({ ok: false, error: 'No encontrado' });
+
+    let imgurl = aviso.imgurl;
+
+    // Si sube nueva imagen, borra la anterior
+    if (req.file) {
+      if (aviso.imgurl && aviso.imgurl.startsWith('/uploads/avisos/')) {
+        const oldPath = path.resolve(__dirname, '../../', aviso.imgurl.replace(/^\//, ''));
+        try { await fs.promises.unlink(oldPath); } catch (_) {}
+      }
+      imgurl = `/uploads/avisos/${req.file.filename}`;
+    }
+
+    // Si no manda alguno de los campos, conservar el anterior
+    const nuevoTitulo = titulo ? titulo.trim() : aviso.titulo;
+    const nuevoTexto = texto ? texto.trim() : aviso.texto;
+
+    const actualizado = await Aviso.updateById(id, {
+      titulo: nuevoTitulo,
+      texto: nuevoTexto,
+      imgurl
+    });
+
+    if (!actualizado) {
+      return res.status(500).json({ ok: false, error: 'No se pudo actualizar el aviso' });
+    }
+
+    res.json({
+      ok: true,
+      data: { id, titulo: nuevoTitulo, texto: nuevoTexto, imgurl }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+

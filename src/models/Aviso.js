@@ -50,6 +50,21 @@ const Aviso = {
   });
 },
 
+  updateById: (id, { titulo, texto, imgurl }) => {
+    return new Promise((resolve, reject) => {
+      const sql = `
+        UPDATE avisos
+        SET titulo = ?, texto = ?, img_url = ?
+        WHERE id = ?
+      `;
+      db.run(sql, [titulo, texto, imgurl, id], function (err) {
+        if (err) return reject(err);
+        resolve(this.changes > 0); // true si actualizó algo
+      });
+    });
+  },
+
+
 
   getById: (id) => {
     return new Promise((resolve, reject) => {
