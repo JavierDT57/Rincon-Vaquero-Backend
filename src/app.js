@@ -5,10 +5,11 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
-
 const userRoutes = require('./routes/userRoutes');
 const avisosRoutes = require('./routes/avisosRoutes');
 const testimoniosRoutes = require('./routes/testimoniosRoutes');
+const dashboardComputedRoutes = require('./routes/dashboardComputedRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 
@@ -37,8 +38,10 @@ app.use('/uploads', express.static(uploadsRoot));
 
 // rutas
 app.use('/api/users', userRoutes);
-app.use('/api/avisos', avisosRoutes);   // <-- BASE PATH FIJO
+app.use('/api/avisos', avisosRoutes);   
 app.use('/api/testimonios', testimoniosRoutes);
+app.use('/api/dashboard', dashboardComputedRoutes);
+app.use('/api/dashboard', dashboardRoutes);  
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Servidor iniciado en puerto ${PORT}`));
