@@ -2,8 +2,8 @@ require('dotenv').config();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-const { sendWelcomeMail } = require('../services/sendMail');
-
+const User = require('../models/User');
+const { sendWelcomeMail, sendPasswordResetMail } = require('../services/sendMail');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'cambialo_en_produccion';
 const SALT_ROUNDS = 10;
@@ -150,12 +150,88 @@ exports.me = (req, res) => {
 };
 
 // Recuperar contraseña (stub)
-exports.recoverPassword = (req, res) => {
-  res.status(501).json({ message: 'Recuperación de contraseña no implementada aquí.' });
+// 1) Solicitar token de recuperación
+exports.requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ ok: false, message: 'Email requerido' });
+
+    const user = await User.findByEmail(email);
+    
+    const token = Math.random().toString().slice(2, 8); 
+    const expiresAt = Date.now() + 15 * 60 * 1000; 
+
+    if (user) {
+      await User.setResetToken(email, token, expiresAt);
+      await sendPasswordResetMail({ to: email, token });
+    }
+
+    return res.json({ ok: true, message: 'Si el correo existe, se envió un código de recuperación.' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, message: 'Error solicitando recuperación' });
+  }
+};
+
+// 2) Verificar token
+exports.verifyPasswordToken = async (req, res) => {
+  try {
+    const { email, token } = req.body || {};
+    if (!email || !token) return res.status(400).json({ ok: false, message: 'Email y token requeridos' });
+
+    const user = await User.findByEmail(email);
+    if (!user || !user.reset_token || !user.reset_expires) {
+      return res.status(400).json({ ok: false, message: 'Token inválido o no solicitado' });
+    }
+    if (String(user.reset_token).trim() !== String(token).trim()) {
+      return res.status(400).json({ ok: false, message: 'Token incorrecto' });
+    }
+    if (Date.now() > Number(user.reset_expires)) {
+      return res.status(400).json({ ok: false, message: 'Token expirado' });
+    }
+
+    return res.json({ ok: true, message: 'Token válido' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, message: 'Error verificando token' });
+  }
+};
+
+// 3) Confirmar nueva contraseña
+exports.confirmPasswordReset = async (req, res) => {
+  try {
+    const { email, token, newPassword, confirmPassword } = req.body || {};
+    if (!email || !token || !newPassword || !confirmPassword) {
+      return res.status(400).json({ ok: false, message: 'Campos requeridos faltantes' });
+    }
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ ok: false, message: 'Las contraseñas no coinciden' });
+    }
+
+    const user = await User.findByEmail(email);
+    if (!user || !user.reset_token || !user.reset_expires) {
+      return res.status(400).json({ ok: false, message: 'Token inválido o no solicitado' });
+    }
+    if (String(user.reset_token).trim() !== String(token).trim()) {
+      return res.status(400).json({ ok: false, message: 'Token incorrecto' });
+    }
+    if (Date.now() > Number(user.reset_expires)) {
+      return res.status(400).json({ ok: false, message: 'Token expirado' });
+    }
+
+    const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await User.updatePassword(email, hash);
+    await User.clearResetToken(email);
+
+    return res.json({ ok: true, message: 'Contraseña actualizada correctamente' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, message: 'Error actualizando contraseña' });
+  }
 };
 
 
 exports.adminOnly = (req, res) => {
-  // Aquí ya pasaste por requireAuth + requireRole('admin')
+  
   res.json({ message: 'Acceso admin OK', user: req.user });
 };
