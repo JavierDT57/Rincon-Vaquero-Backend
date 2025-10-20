@@ -10,6 +10,9 @@ const avisosRoutes = require('./routes/avisosRoutes');
 const testimoniosRoutes = require('./routes/testimoniosRoutes');
 const dashboardComputedRoutes = require('./routes/dashboardComputedRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const { requireAuth, requireRole } = require('./middlewares/auth'); // ya lo tienes creado
+const jwt = require('jsonwebtoken'); // para el gate de páginas
+
 
 const app = express();
 
@@ -18,16 +21,12 @@ app.use((req, _res, next) => {  // DEBUG
   next();
 });
 
-// manejador de errores (incluye Multer)
-app.use((err, _req, res, _next) => {
-  if (err && err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(400).json({ ok: false, error: 'Archivo demasiado grande (máx 5MB)' });
-  }
-  return res.status(400).json({ ok: false, error: err?.message || 'Error de solicitud' });
-});
 
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials: true
+}));
 
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -38,10 +37,11 @@ app.use('/uploads', express.static(uploadsRoot));
 
 // rutas
 app.use('/api/users', userRoutes);
-app.use('/api/avisos', avisosRoutes);   
+app.use('/api/avisos', require('./routes/avisosRoutes'));   // usa siempre el mismo archivo
+app.use('/api/tienda', require('./routes/tiendaRoutes'));
 app.use('/api/testimonios', testimoniosRoutes);
 app.use('/api/dashboard', dashboardComputedRoutes);
-app.use('/api/dashboard', dashboardRoutes);  
+app.use('/api/dashboard', dashboardRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Servidor iniciado en puerto ${PORT}`));

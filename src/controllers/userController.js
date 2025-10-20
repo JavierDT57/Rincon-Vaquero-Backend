@@ -153,3 +153,9 @@ exports.me = (req, res) => {
 exports.recoverPassword = (req, res) => {
   res.status(501).json({ message: 'Recuperación de contraseña no implementada aquí.' });
 };
+
+
+exports.adminOnly = (req, res) => {
+  // Aquí ya pasaste por requireAuth + requireRole('admin')
+  res.json({ message: 'Acceso admin OK', user: req.user });
+};

@@ -1,22 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
-const auth = require('../middlewares/auth');
-const requireAdmin = require('../middlewares/requireAdmin');
-const usersAdminCtrl = require('../controllers/usersAdminController');
+const { requireAuth, requireRole } = require('../middlewares/auth');
 
+const usersAdminCtrl = require('../controllers/usersAdminController');
 
 router.post('/register', userController.register);
 router.post('/create-admin', userController.createAdmin);
 router.post('/login', userController.login);
-router.post('/logout', userController.logout);
+router.post('/logout', requireAuth, userController.logout); 
 router.post('/recover-password', userController.recoverPassword);
-// Endpoints de administración de usuarios (protegidos con admin)
-router.get('/me', auth, userController.me);
-router.get('/',    auth, requireAdmin, usersAdminCtrl.listUsers);
-router.get('/:id', auth, requireAdmin, usersAdminCtrl.getUser);
-router.put('/:id', auth, requireAdmin, usersAdminCtrl.updateUser);
-router.delete('/:id', auth, requireAdmin, usersAdminCtrl.deleteUser);
 
+router.get('/me', requireAuth, userController.me);
+router.get('/solo-admin', requireAuth, requireRole('admin'), userController.adminOnly);
+
+
+router.get('/',     requireAuth, requireRole('admin'), usersAdminCtrl.listUsers);
+router.get('/:id',  requireAuth, requireRole('admin'), usersAdminCtrl.getUser);
+router.put('/:id',  requireAuth, requireRole('admin'), usersAdminCtrl.updateUser);
+router.delete('/:id', requireAuth, requireRole('admin'), usersAdminCtrl.deleteUser);
 
 module.exports = router;
