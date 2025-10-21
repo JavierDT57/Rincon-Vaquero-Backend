@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
+
 const {
   crearTestimonio,
   listarTestimonios,
@@ -11,16 +12,18 @@ const {
   editarTestimonio,
   eliminarTestimonio
 } = require('../controllers/testimoniosController');
+
 const requireAdmin = require('../middlewares/requireAdmin');
-const { requireAuth } = require('../middlewares/auth');
+const { requireAuth } = require('../middlewares/auth'); // tu middleware de sesión
+const { uploadLimiter } = require('../middlewares/limiters');
+const { checkMagicBytes, enforceDimensions, reencodeAndStrip } = require('../middlewares/imageSecurity');
 
 const router = express.Router();
 
-// asegurar carpeta destino
+
 const dest = path.resolve(__dirname, '../../uploads/testimonios');
 fs.mkdirSync(dest, { recursive: true });
 
-// Multer (almacenamiento local) — campo de archivo: "imagenurl"
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, dest),
   filename: (_req, file, cb) => {
@@ -30,17 +33,42 @@ const storage = multer.diskStorage({
   }
 });
 function fileFilter(_req, file, cb) {
-  const allowed = ['image/png','image/jpeg','image/jpg','image/webp','image/gif'];
-  if (!allowed.includes(file.mimetype)) return cb(new Error('Solo imágenes (png, jpg, webp, gif)'), false);
+  const allowed = ['image/png', 'image/jpeg', 'image/webp'];
+  if (!allowed.includes(file.mimetype)) return cb(new Error('Solo JPG/PNG/WebP'), false);
   cb(null, true);
 }
-const upload = multer({ storage, fileFilter, limits: { fileSize: 15 * 1024 * 1024 } });
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024, files: 1, parts: 6, fields: 8 },
+});
 
-// Base path en app.js será /api/testimonios ⇒ rutas:
-router.get('/', listarTestimonios);                                         // GET    /api/testimonios
-router.get('/:id', obtenerTestimonio);                                      // GET    /api/testimonios/:id
-router.post('/', requireAuth, upload.single('imagenurl'), crearTestimonio); // POST   /api/testimonios
-router.put('/:id', requireAdmin, upload.single('imagenurl'), editarTestimonio); // PUT /api/testimonios/:id
-router.delete('/:id', requireAdmin, eliminarTestimonio);                    // DELETE /api/testimonios/:id
+
+router.get('/', listarTestimonios);
+router.get('/:id', obtenerTestimonio);
+
+
+router.post('/',
+  requireAuth,
+  uploadLimiter,
+  upload.single('imagenurl'),     
+  checkMagicBytes,
+  enforceDimensions(6000, 6000, 30),
+  reencodeAndStrip('webp', 85),
+  crearTestimonio
+);
+
+
+router.put('/:id',
+  requireAdmin,
+  uploadLimiter,
+  upload.single('imagenurl'),
+  checkMagicBytes,
+  enforceDimensions(6000, 6000, 30),
+  reencodeAndStrip('webp', 8),
+  editarTestimonio
+);
+
+router.delete('/:id', requireAdmin, eliminarTestimonio);
 
 module.exports = router;

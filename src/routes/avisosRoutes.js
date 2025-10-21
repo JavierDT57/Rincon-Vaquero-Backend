@@ -4,17 +4,18 @@ const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
+
 const { crearAviso, listarAvisos, obtenerAviso, eliminarAviso, editarAviso } = require('../controllers/avisosController');
 const requireAdmin = require('../middlewares/requireAdmin');
-const { requireAuth } = require('../middlewares/auth');
+const { uploadLimiter } = require('../middlewares/limiters');
+const { checkMagicBytes, enforceDimensions, reencodeAndStrip } = require('../middlewares/imageSecurity');
 
 const router = express.Router();
 
-// asegurar carpeta destino
+
 const dest = path.resolve(__dirname, '../../uploads/avisos');
 fs.mkdirSync(dest, { recursive: true });
 
-// Multer (almacenamiento local)
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, dest),
   filename: (_req, file, cb) => {
@@ -24,18 +25,41 @@ const storage = multer.diskStorage({
   }
 });
 function fileFilter(_req, file, cb) {
-  const allowed = ['image/png','image/jpeg','image/jpg','image/webp','image/gif'];
-  if (!allowed.includes(file.mimetype)) return cb(new Error('Solo imágenes (png, jpg, webp, gif)'), false);
+  const allowed = ['image/png', 'image/jpeg', 'image/webp']; // bloquea gif/svg/etc.
+  if (!allowed.includes(file.mimetype)) return cb(new Error('Solo JPG/PNG/WebP'), false);
   cb(null, true);
 }
-// ⬆️ límite a 15 MB 
-const upload = multer({ storage, fileFilter, limits: { fileSize: 15 * 1024 * 1024 } });
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024, files: 1, parts: 6, fields: 6 },
+});
 
-// Rutas:
-router.get('/', listarAvisos);                                              // GET    /api/avisos
-router.get('/:id', obtenerAviso);                                           // GET    /api/avisos/:id
-router.post('/', requireAdmin, upload.single('imagen'), crearAviso);        // POST   /api/avisos
-router.put('/:id', requireAdmin, upload.single('imagen'), editarAviso);     // PUT    /api/avisos/:id
-router.delete('/:id', requireAdmin, eliminarAviso);                         // DELETE /api/avisos/:id
+
+router.get('/', listarAvisos);
+router.get('/:id', obtenerAviso);
+
+
+router.post('/',
+  requireAdmin,
+  uploadLimiter,
+  upload.single('imagen'),
+  checkMagicBytes,
+  enforceDimensions(6000, 6000, 30),
+  reencodeAndStrip('webp', 85),
+  crearAviso
+);
+
+router.put('/:id',
+  requireAdmin,
+  uploadLimiter,
+  upload.single('imagen'),
+  checkMagicBytes,
+  enforceDimensions(6000, 6000, 30),
+  reencodeAndStrip('webp', 85),
+  editarAviso
+);
+
+router.delete('/:id', requireAdmin, eliminarAviso);
 
 module.exports = router;
