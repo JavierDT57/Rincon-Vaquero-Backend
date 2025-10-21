@@ -4,7 +4,16 @@ const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
-const { crearTestimonio, listarTestimonios, obtenerTestimonio, eliminarTestimonio, editarTestimonio } = require('../controllers/testimoniosController');
+const {
+  crearTestimonio,
+  listarTestimonios,
+  obtenerTestimonio,
+  editarTestimonio,
+  eliminarTestimonio
+} = require('../controllers/testimoniosController');
+const requireAdmin = require('../middlewares/requireAdmin');
+const { requireAuth } = require('../middlewares/auth');
+
 const router = express.Router();
 
 // asegurar carpeta destino
@@ -27,11 +36,11 @@ function fileFilter(_req, file, cb) {
 }
 const upload = multer({ storage, fileFilter, limits: { fileSize: 15 * 1024 * 1024 } });
 
-// Base path en app.js será /api/testimonios ⇒ rutas relativas:
-router.get('/', listarTestimonios);                                    // GET    /api/testimonios
-router.get('/:id', obtenerTestimonio);                                 // GET    /api/testimonios/:id
-router.post('/', upload.single('imagenurl'), crearTestimonio);         // POST   /api/testimonios
-router.put('/:id', upload.single('imagenurl'), editarTestimonio); // PUT /api/testimonios/:id
-router.delete('/:id', eliminarTestimonio);                             // DELETE /api/testimonios/:id
+// Base path en app.js será /api/testimonios ⇒ rutas:
+router.get('/', listarTestimonios);                                         // GET    /api/testimonios
+router.get('/:id', obtenerTestimonio);                                      // GET    /api/testimonios/:id
+router.post('/', requireAuth, upload.single('imagenurl'), crearTestimonio); // POST   /api/testimonios
+router.put('/:id', requireAdmin, upload.single('imagenurl'), editarTestimonio); // PUT /api/testimonios/:id
+router.delete('/:id', requireAdmin, eliminarTestimonio);                    // DELETE /api/testimonios/:id
 
 module.exports = router;

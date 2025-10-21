@@ -5,6 +5,8 @@ const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
 const { crearAviso, listarAvisos, obtenerAviso, eliminarAviso, editarAviso } = require('../controllers/avisosController');
+const requireAdmin = require('../middlewares/requireAdmin');
+const { requireAuth } = require('../middlewares/auth');
 
 const router = express.Router();
 
@@ -21,21 +23,19 @@ const storage = multer.diskStorage({
     cb(null, `${name}${ext}`);
   }
 });
-
 function fileFilter(_req, file, cb) {
   const allowed = ['image/png','image/jpeg','image/jpg','image/webp','image/gif'];
   if (!allowed.includes(file.mimetype)) return cb(new Error('Solo imágenes (png, jpg, webp, gif)'), false);
   cb(null, true);
 }
-
-// ⬆️ límite a 15 MB para aceptar tus JPG grandes
+// ⬆️ límite a 15 MB 
 const upload = multer({ storage, fileFilter, limits: { fileSize: 15 * 1024 * 1024 } });
 
-// Base path en app.js es /api/avisos ⇒ aquí rutas relativas:
-router.get('/', listarAvisos);                         // GET  /api/avisos
-router.get('/:id', obtenerAviso);                      // GET  /api/avisos/:id
-router.post('/', upload.single('imagen'), crearAviso); // POST /api/avisos  (campo archivo: imagen)
-router.put('/:id', upload.single('imagen'), editarAviso); // PUT /api/avisos/:id
-router.delete('/:id', eliminarAviso);                  // DELETE /api/avisos/:id
+// Rutas:
+router.get('/', listarAvisos);                                              // GET    /api/avisos
+router.get('/:id', obtenerAviso);                                           // GET    /api/avisos/:id
+router.post('/', requireAdmin, upload.single('imagen'), crearAviso);        // POST   /api/avisos
+router.put('/:id', requireAdmin, upload.single('imagen'), editarAviso);     // PUT    /api/avisos/:id
+router.delete('/:id', requireAdmin, eliminarAviso);                         // DELETE /api/avisos/:id
 
 module.exports = router;
