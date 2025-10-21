@@ -8,11 +8,34 @@ const { sendWelcomeMail, sendPasswordResetMail } = require('../services/sendMail
 const JWT_SECRET = process.env.JWT_SECRET || 'cambialo_en_produccion';
 const SALT_ROUNDS = 10;
 
+// --- Política de contraseñas ---
+function validatePassword(pwd) {
+  if (typeof pwd !== 'string') {
+    return { ok: false, message: 'Contraseña inválida.' };
+  }
+  const faltas = [];
+  if (pwd.length < 8) faltas.push('al menos 8 caracteres');
+  if (!/\d/.test(pwd)) faltas.push('al menos un número');
+  if (!/[^\w\s]/.test(pwd)) faltas.push('al menos un símbolo (p. ej., !@#$%&*.)');
+  if (/\s/.test(pwd)) faltas.push('sin espacios');
+
+  if (faltas.length) {
+    return { ok: false, message: `La contraseña no cumple: ${faltas.join(', ')}.` };
+  }
+  return { ok: true };
+}
+
+
 // Registro de usuario
 exports.register = (req, res) => {
   const { nombre, apellidos, email, password } = req.body;
   if (!nombre || !apellidos || !email || !password)
     return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
+  
+  const check = validatePassword(password);
+  if (!check.ok) {
+    return res.status(400).json({ message: check.message });
+  }
 
   db.get('SELECT id FROM users WHERE email = ?', [email], (err, row) => {
     if (err) return res.status(500).json({ message: 'Error en la base de datos' });
@@ -54,6 +77,11 @@ exports.createAdmin = (req, res) => {
   const { nombre, apellidos, email, password } = req.body;
   if (!nombre || !apellidos || !email || !password)
     return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
+  
+  const check = validatePassword(password);
+  if (!check.ok) {
+    return res.status(400).json({ message: check.message });
+  }
 
   db.get('SELECT id FROM users WHERE email = ?', [email], (err, row) => {
     if (err) return res.status(500).json({ message: 'Error en la base de datos' });
@@ -206,6 +234,11 @@ exports.confirmPasswordReset = async (req, res) => {
     }
     if (newPassword !== confirmPassword) {
       return res.status(400).json({ ok: false, message: 'Las contraseñas no coinciden' });
+    }
+
+    const check = validatePassword(newPassword);
+    if (!check.ok) {
+      return res.status(400).json({ ok: false, message: check.message });
     }
 
     const user = await User.findByEmail(email);
