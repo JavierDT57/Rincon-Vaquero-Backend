@@ -31,6 +31,8 @@ async function migrate() {
       passwordHash TEXT NOT NULL,
       rol TEXT DEFAULT 'usuario',
       isActive INTEGER DEFAULT 1,
+      reset_token TEXT,           
+      reset_expires INTEGER,      
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );`,
 
