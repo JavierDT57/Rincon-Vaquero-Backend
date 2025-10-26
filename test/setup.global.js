@@ -1,21 +1,34 @@
-// __tests__/setup.global.js
-const { migrate } = require('../db/migrate'); // migración
-
-beforeAll(async () => {
-  await migrate(); // DB de test
-});
-
+//tests/setup.global.js
+const { migrate } = require('../db/migrate'); 
 
 const fs = require('fs');
 const path = require('path');
 
-jest.setTimeout(30000); 
+jest.setTimeout(30000);
 
-// 1) Mock global de nodemailer 
+// Helpers de FS
+
+function ensure(dir) {
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function safeRm(dir) {
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+}
+
+function emptyDir(dir) {
+  if (!fs.existsSync(dir)) return;
+  for (const name of fs.readdirSync(dir)) {
+    const full = path.join(dir, name);
+    safeRm(full);
+  }
+}
+
+// Mock global de nodemailer
 jest.mock('nodemailer', () => {
   return {
     createTransport: () => ({
-      
       sendMail: jest.fn().mockResolvedValue({
         messageId: 'mocked-message-id',
         accepted: [],
@@ -26,46 +39,61 @@ jest.mock('nodemailer', () => {
   };
 });
 
-// 2) carpeta temporal de uploads 
-const uploadsRoot = process.env.UPLOADS_DIR
+
+const PUBLIC_BASE = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
-  : path.resolve(__dirname, '..', '..', '.tmp', 'uploads');
+  : path.resolve(process.cwd(), 'uploads');
 
-function safeRm(dir) {
-  try {
-    
-    fs.rmSync(dir, { recursive: true, force: true });
-  } catch (e) {
-    try { fs.rmdirSync(dir, { recursive: true }); } catch (_) {}
-  }
-}
+const TMP_BASE = process.env.UPLOADS_TMP_DIR
+  ? path.resolve(process.env.UPLOADS_TMP_DIR)
+  : path.resolve(process.cwd(), '.tmp', 'uploads');
 
-beforeAll(() => {
-  // limpiar y crea carpeta
-  safeRm(uploadsRoot);
-  fs.mkdirSync(uploadsRoot, { recursive: true });
+// Subcarpetas 
+const WORK_DIRS = [
+  path.join(PUBLIC_BASE),
+  path.join(PUBLIC_BASE, 'avisos'),
+  path.join(PUBLIC_BASE, 'testimonios'),
+  path.join(TMP_BASE),
+  path.join(TMP_BASE, 'avisos'),
+  path.join(TMP_BASE, 'testimonios'),
+];
+
+// Migración de DB 
+
+beforeAll(async () => {
+  await migrate(); // DB de test
+
+  safeRm(TMP_BASE);
+  for (const d of WORK_DIRS) ensure(d);
+
+  emptyDir(PUBLIC_BASE);
+  ensure(path.join(PUBLIC_BASE, 'avisos'));
+  ensure(path.join(PUBLIC_BASE, 'testimonios'));
 });
+
+// Limpieza entre tests 
 
 afterEach(() => {
-  
-  try {
-    for (const p of fs.readdirSync(uploadsRoot)) {
-      const full = path.join(uploadsRoot, p);
-      safeRm(full);
-    }
-  } catch {}
+  emptyDir(path.join(PUBLIC_BASE, 'avisos'));
+  emptyDir(path.join(PUBLIC_BASE, 'testimonios'));
+  emptyDir(path.join(TMP_BASE, 'avisos'));
+  emptyDir(path.join(TMP_BASE, 'testimonios'));
 });
 
+// Limpieza final
 afterAll(() => {
-  // borrar todo al terminar 
-  safeRm(uploadsRoot);
+  safeRm(TMP_BASE);
+  emptyDir(path.join(PUBLIC_BASE, 'avisos'));
+  emptyDir(path.join(PUBLIC_BASE, 'testimonios'));
 });
 
-// 
 const mute = (orig) => (...args) => {
   const msg = (args[0] || '') + '';
-  
-  if (msg.startsWith('GET ') || msg.startsWith('POST ') || msg.startsWith('PUT ') || msg.startsWith('DELETE ')) return;
+  if (
+    msg.startsWith('GET ') ||
+    msg.startsWith('POST ') ||
+    msg.startsWith('PUT ') ||
+    msg.startsWith('DELETE ')
+  ) return;
   return orig.apply(console, args);
 };
-
