@@ -8,8 +8,14 @@ Testimonio.init();
 const uploadsDir = path.resolve(__dirname, '../../uploads/testimonios');
 fs.mkdirSync(uploadsDir, { recursive: true });
 
+// Crear (solo logueado) 
+// queda 'pending' y ligado a user_id
 exports.crearTestimonio = async (req, res, next) => {
   try {
+    if (!req.user?.id) {
+      return res.status(401).json({ ok: false, error: 'No autenticado' });
+    }
+
     const { comentario, fecha, imagenurl: imagenurlBody, localidad, nombre, rating } = req.body || {};
 
     if (!comentario || !localidad || !nombre || typeof rating === 'undefined') {
@@ -23,26 +29,27 @@ exports.crearTestimonio = async (req, res, next) => {
 
     let imagenurl = null;
     if (req.file) {
-      imagenurl = `/uploads/testimonios/${req.file.filename}`; // vía form-data (campo: imagenurl)
+      imagenurl = `/uploads/testimonios/${req.file.filename}`;
     } else if (typeof imagenurlBody === 'string' && imagenurlBody.trim() !== '') {
-      imagenurl = imagenurlBody.trim(); // vía JSON con URL existente (opcional)
+      imagenurl = imagenurlBody.trim();
     }
 
-    // fecha: si no llega, usamos ahora en ISO
     let fechaFinal = new Date().toISOString();
     if (typeof fecha === 'string' && fecha.trim() !== '' && !Number.isNaN(Date.parse(fecha))) {
       fechaFinal = new Date(fecha).toISOString();
     }
 
     try {
-      const creado = await Testimonio.create({
+      const { id } = await Testimonio.create({
+        userId: req.user.id,
         comentario: String(comentario).trim(),
         fecha: fechaFinal,
         imagenurl,
         localidad: String(localidad).trim(),
         nombre: String(nombre).trim(),
-        rating: ratingInt
+        rating: Number(ratingInt)
       });
+      const creado = await Testimonio.getById(id);
       return res.status(201).json({ ok: true, data: creado });
     } catch (dbErr) {
       if (req.file && req.file.path) { try { await fs.promises.unlink(req.file.path); } catch (_) {} }
@@ -53,6 +60,7 @@ exports.crearTestimonio = async (req, res, next) => {
   }
 };
 
+// Público: solo approved
 exports.listarTestimonios = async (_req, res, next) => {
   try {
     const rows = await Testimonio.getAll();
@@ -96,6 +104,7 @@ exports.eliminarTestimonio = async (req, res, next) => {
   }
 };
 
+// Editar contenido (solo admin, PUT)
 exports.editarTestimonio = async (req, res, next) => {
   try {
     const id = Number(req.params.id);
@@ -108,11 +117,9 @@ exports.editarTestimonio = async (req, res, next) => {
     const actual = await Testimonio.getById(id);
     if (!actual) return res.status(404).json({ ok: false, error: 'No encontrado' });
 
-    // Mantener imagen actual salvo que llegue una nueva (archivo o URL)
+    // Imagen
     let imagenurl = actual.imagenurl;
-
     if (req.file) {
-      // borrar anterior si era local
       if (actual.imagenurl && actual.imagenurl.startsWith('/uploads/testimonios/')) {
         const oldPath = path.resolve(__dirname, '../../', actual.imagenurl.replace(/^\//, ''));
         try { await fs.promises.unlink(oldPath); } catch (_) {}
@@ -122,11 +129,12 @@ exports.editarTestimonio = async (req, res, next) => {
       imagenurl = imagenurlFromBody.trim();
     }
 
-    // Mantener valores si no se mandan
+    // Textos
     const nuevoComentario = (typeof comentario === 'string' && comentario.trim() !== '') ? comentario.trim() : actual.comentario;
     const nuevaLocalidad  = (typeof localidad  === 'string' && localidad.trim()  !== '') ? localidad.trim()  : actual.localidad;
     const nuevoNombre     = (typeof nombre     === 'string' && nombre.trim()     !== '') ? nombre.trim()     : actual.nombre;
 
+    // Rating
     let nuevoRating = actual.rating;
     if (typeof rating !== 'undefined') {
       const r = parseInt(rating, 10);
@@ -136,12 +144,11 @@ exports.editarTestimonio = async (req, res, next) => {
       nuevoRating = r;
     }
 
+    // Fecha
     let nuevaFecha = actual.fecha;
     if (typeof fecha === 'string' && fecha.trim() !== '') {
       const d = new Date(fecha);
-      if (Number.isNaN(d.getTime())) {
-        return res.status(400).json({ ok: false, error: 'fecha inválida' });
-      }
+      if (Number.isNaN(d.getTime())) return res.status(400).json({ ok: false, error: 'fecha inválida' });
       nuevaFecha = d.toISOString();
     }
 
@@ -170,6 +177,40 @@ exports.editarTestimonio = async (req, res, next) => {
         rating: nuevoRating
       }
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ===== Moderación (solo admin) =====
+
+// Listar por estado: pending | approved
+exports.listarTestimoniosModeracion = async (req, res, next) => {
+  try {
+    const status = String(req.query.status || 'pending').toLowerCase();
+    if (!['pending','approved'].includes(status)) {
+      return res.status(400).json({ ok: false, error: 'status inválido' });
+    }
+    const rows = await Testimonio.findByStatus(status);
+    res.json({ ok: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Aprobar (PATCH)
+exports.aprobarTestimonio = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ ok: false, error: 'ID inválido' });
+    }
+
+    const ok = await Testimonio.updateStatus(id, 'approved');
+    if (!ok) return res.status(404).json({ ok: false, error: 'No encontrado' });
+
+    const row = await Testimonio.getById(id);
+    res.json({ ok: true, data: row });
   } catch (err) {
     next(err);
   }

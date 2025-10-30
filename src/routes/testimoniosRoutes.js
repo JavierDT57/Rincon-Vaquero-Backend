@@ -10,7 +10,9 @@ const {
   listarTestimonios,
   obtenerTestimonio,
   editarTestimonio,
-  eliminarTestimonio
+  eliminarTestimonio,
+  listarTestimoniosModeracion, 
+  aprobarTestimonio           
 } = require('../controllers/testimoniosController');
 
 const requireAdmin = require('../middlewares/requireAdmin');
@@ -57,10 +59,11 @@ function pickSingleFile(req, _res, next) {
   next();
 }
 
-// === Rutas ===
-router.get('/', listarTestimonios);
-router.get('/:id', obtenerTestimonio);
 
+// Público
+router.get('/', listarTestimonios);
+
+// Crear (logueado)
 router.post('/',
   requireAuth,
   uploadLimiter,
@@ -72,6 +75,11 @@ router.post('/',
   crearTestimonio
 );
 
+// Moderación (admin)
+router.get('/admin', requireAdmin, listarTestimoniosModeracion);
+router.patch('/admin/:id', requireAdmin, aprobarTestimonio);
+
+// Editar/Eliminar (admin)
 router.put('/:id',
   requireAdmin,
   uploadLimiter,
@@ -84,5 +92,8 @@ router.put('/:id',
 );
 
 router.delete('/:id', requireAdmin, eliminarTestimonio);
+
+// Detalle (público) — al final para no interceptar /admin
+router.get('/:id', obtenerTestimonio);
 
 module.exports = router;
