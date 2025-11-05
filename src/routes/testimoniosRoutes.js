@@ -11,8 +11,10 @@ const {
   obtenerTestimonio,
   editarTestimonio,
   eliminarTestimonio,
-  listarTestimoniosModeracion, 
-  aprobarTestimonio           
+  listarTestimoniosModeracion,
+  aprobarTestimonio,
+  obtenerAnalisisAdmin,   
+  guardarResumenAdmin     
 } = require('../controllers/testimoniosController');
 
 const requireAdmin = require('../middlewares/requireAdmin');
@@ -59,7 +61,6 @@ function pickSingleFile(req, _res, next) {
   next();
 }
 
-
 // Público
 router.get('/', listarTestimonios);
 
@@ -78,6 +79,10 @@ router.post('/',
 // Moderación (admin)
 router.get('/admin', requireAdmin, listarTestimoniosModeracion);
 router.patch('/admin/:id', requireAdmin, aprobarTestimonio);
+
+// Moderación asistida
+router.get('/admin/:id/analisis', requireAdmin, obtenerAnalisisAdmin);   // devuelve JSON de 'analisis'
+router.post('/admin/:id/resumen', requireAdmin, guardarResumenAdmin);    // guarda texto en 'resumen'
 
 // Editar/Eliminar (admin)
 router.put('/:id',

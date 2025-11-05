@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const Testimonio = require('../models/Testimonio');
+const { queueModeration } = require('../jobs/moderation');
 
 Testimonio.init();
 
@@ -9,7 +10,6 @@ const uploadsDir = path.resolve(__dirname, '../../uploads/testimonios');
 fs.mkdirSync(uploadsDir, { recursive: true });
 
 // Crear (solo logueado) 
-// queda 'pending' y ligado a user_id
 exports.crearTestimonio = async (req, res, next) => {
   try {
     if (!req.user?.id) {
@@ -47,9 +47,19 @@ exports.crearTestimonio = async (req, res, next) => {
         imagenurl,
         localidad: String(localidad).trim(),
         nombre: String(nombre).trim(),
-        rating: Number(ratingInt)
+        rating: Number(ratingInt),
+        status: 'pending',
+        analisis: null,   
+        resumen: null     
       });
+
       const creado = await Testimonio.getById(id);
+
+      // Encola moderación si hay imagen local
+      if (creado?.imagenurl && creado.imagenurl.startsWith('/uploads/')) {
+        queueModeration(id, creado.imagenurl);
+      }
+
       return res.status(201).json({ ok: true, data: creado });
     } catch (dbErr) {
       if (req.file && req.file.path) { try { await fs.promises.unlink(req.file.path); } catch (_) {} }
@@ -60,10 +70,10 @@ exports.crearTestimonio = async (req, res, next) => {
   }
 };
 
-// Público: solo approved
+// Público: solo approved 
 exports.listarTestimonios = async (_req, res, next) => {
   try {
-    const rows = await Testimonio.getAll();
+    const rows = await Testimonio.findByStatus('approved');
     res.json({ ok: true, data: rows });
   } catch (err) {
     next(err);
@@ -214,4 +224,36 @@ exports.aprobarTestimonio = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+// Devuelve el JSON guardado
+exports.obtenerAnalisisAdmin = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const row = await Testimonio.getById(id);
+    if (!row) return res.status(404).json({ ok: false, error: 'No encontrado' });
+
+    let parsed = null;
+    if (typeof row.analisis === 'string' && row.analisis.trim() !== '') {
+      try { parsed = JSON.parse(row.analisis); } catch (_) { parsed = row.analisis; }
+    }
+    res.json({ ok: true, data: { id: row.id, analisis: parsed } });
+  } catch (err) { next(err); }
+};
+
+// Guarda el texto generado por Gemini
+exports.guardarResumenAdmin = async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const { resumen } = req.body || {};
+    if (typeof resumen !== 'string' || resumen.trim() === '') {
+      return res.status(400).json({ ok: false, error: 'resumen requerido' });
+    }
+    const cleaned = resumen.trim().slice(0, 500);
+
+    const ok = await Testimonio.updateById(id, { resumen: cleaned });
+    if (!ok) return res.status(404).json({ ok: false, error: 'No encontrado' });
+
+    const row = await Testimonio.getById(id);
+    res.json({ ok: true, data: { id: row.id, resumen: row.resumen } });
+  } catch (err) { next(err); }
 };

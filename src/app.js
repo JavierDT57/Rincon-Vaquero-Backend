@@ -79,6 +79,11 @@ app.use('/media', (req, res) => {
   }
 });
 
+if (process.env.SANDBOX_ENABLED === 'true') {
+  const sandboxRoutes = require('./routes/sandboxRoutes');
+  app.use('/sandbox', sandboxRoutes);
+}
+
 // ===== Rutas API =====
 app.use('/api/users', userRoutes);
 app.use('/api/avisos', avisosRoutes);

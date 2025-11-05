@@ -15,13 +15,15 @@ const Testimonio = {
         rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5)
       )
     `);
-    // Migraciones   
     db.all(`PRAGMA table_info(testimonios)`, (err, rows) => {
       if (err || !Array.isArray(rows)) return;
       const cols = rows.map(r => r.name);
       const alters = [];
+
       if (!cols.includes('user_id')) alters.push(`ALTER TABLE testimonios ADD COLUMN user_id INTEGER`);
       if (!cols.includes('status'))  alters.push(`ALTER TABLE testimonios ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'`);
+      if (!cols.includes('analisis')) alters.push(`ALTER TABLE testimonios ADD COLUMN analisis TEXT`);
+      if (!cols.includes('resumen'))  alters.push(`ALTER TABLE testimonios ADD COLUMN resumen TEXT`);
 
       if (alters.length) {
         db.exec(alters.join(';\n') + ';', (e2) => {
@@ -36,8 +38,10 @@ const Testimonio = {
   create: ({ userId, comentario, fecha, imagenurl, localidad, nombre, rating }) => {
     return new Promise((resolve, reject) => {
       const sql = `
-        INSERT INTO testimonios (user_id, comentario, fecha, imagen_url, localidad, nombre, rating, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+        INSERT INTO testimonios
+          (user_id, comentario, fecha, imagen_url, localidad, nombre, rating, status, analisis, resumen)
+        VALUES
+          (?,       ?,          ?,     ?,          ?,         ?,      ?,      'pending', NULL,    NULL)
       `;
       db.run(sql, [userId || null, comentario, fecha, imagenurl, localidad, nombre, rating], function (err) {
         if (err) return reject(err);
@@ -59,6 +63,8 @@ const Testimonio = {
            nombre,
            rating,
            status,
+           analisis,
+           resumen,
            user_id AS userId
          FROM testimonios
          WHERE status = 'approved'
@@ -82,6 +88,8 @@ const Testimonio = {
            nombre,
            rating,
            status,
+           analisis,
+           resumen,
            user_id AS userId
          FROM testimonios
          WHERE id = ?`,
@@ -91,15 +99,37 @@ const Testimonio = {
     });
   },
 
-  // Editar contenido (PUT admin)
-  updateById: (id, { comentario, fecha, imagenurl, localidad, nombre, rating }) => {
+  updateById: (id, patch = {}) => {
     return new Promise((resolve, reject) => {
-      const sql = `
-        UPDATE testimonios
-        SET comentario = ?, fecha = ?, imagen_url = ?, localidad = ?, nombre = ?, rating = ?
-        WHERE id = ?
-      `;
-      db.run(sql, [comentario, fecha, imagenurl, localidad, nombre, rating, id], function (err) {
+      const map = {
+        comentario: 'comentario',
+        fecha: 'fecha',
+        imagenurl: 'imagen_url',
+        localidad: 'localidad',
+        nombre: 'nombre',
+        rating: 'rating',
+        status: 'status',
+        analisis: 'analisis',
+        resumen: 'resumen',
+      };
+
+      const sets = [];
+      const params = [];
+      for (const [k, v] of Object.entries(patch)) {
+        if (!(k in map)) continue;
+        if (typeof v === 'undefined') continue;
+        sets.push(`${map[k]} = ?`);
+        params.push(v);
+      }
+
+      if (sets.length === 0) {
+        return resolve(false);
+      }
+
+      const sql = `UPDATE testimonios SET ${sets.join(', ')} WHERE id = ?`;
+      params.push(id);
+
+      db.run(sql, params, function (err) {
         if (err) return reject(err);
         resolve(this.changes > 0);
       });
@@ -128,6 +158,8 @@ const Testimonio = {
            nombre,
            rating,
            status,
+           analisis,
+           resumen,
            user_id AS userId
          FROM testimonios
          WHERE status = ?
