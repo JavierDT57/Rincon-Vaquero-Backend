@@ -1,12 +1,14 @@
 // src/jobs/moderation.job.js
-// lee la imagen, llama a Sightengine y guarda analisis 
+// Lee la imagen, llama a Sightengine, guarda analisis y asegura el resumen (Gemini)
 
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+
 const Testimonio = require('../models/Testimonio');
 const { analyzeBuffer } = require('../services/sightengineClient');
+const { ensureResumen } = require('../services/geminiSummary');
 const { applyPolicyV2, CURRENT_ANALYSIS_VERSION } = require('../policies/policy.engine');
 
 const uploadsRoot = process.env.UPLOADS_DIR
@@ -15,8 +17,8 @@ const uploadsRoot = process.env.UPLOADS_DIR
 
 function safeResolveFromWebPath(webPath) {
   if (!webPath || !webPath.startsWith('/uploads/')) return null;
-  const rel = webPath.replace(/^\/uploads\/?/, ''); 
-  return path.join(uploadsRoot, rel);               
+  const rel = webPath.replace(/^\/uploads\/?/, '');
+  return path.join(uploadsRoot, rel);
 }
 
 async function processModeration({ id, webPath }) {
@@ -33,8 +35,14 @@ async function processModeration({ id, webPath }) {
     const row = await Testimonio.getById(id);
     if (!row) return;
 
+    //Genera analisis SOLO si está NULL 
     if (row.content_hash && row.content_hash === hash && row.analisis) {
       console.log('[moderation] skip (same hash & analisis present):', id);
+      try {
+        await ensureResumen({ id });
+      } catch (e) {
+        console.warn('[moderation] resumen omitido en skip para id', id, e.message);
+      }
       return;
     }
 
@@ -68,13 +76,24 @@ async function processModeration({ id, webPath }) {
     if ('score_alcohol' in row) patch.score_alcohol = derived.indices.alcohol;
     if ('score_drug' in row) patch.score_drug = derived.indices.drugs;
 
+    if ('resumen' in row) patch.resumen = null;
+
     await Testimonio.updateById(id, patch);
     console.log('[moderation] saved analysis for id', id);
+
+    // Genera resumen SOLO si está NULL 
+    try {
+      await ensureResumen({ id, analisisPayload });
+      console.log('[moderation] resumen generado para id', id);
+    } catch (e) {
+      console.warn('[moderation] no se pudo generar resumen para id', id, e.message);
+    }
   } catch (err) {
     console.error('[moderation] error for id', id, err?.response?.data || err?.message || err);
   }
 }
 
+// Cola para procesar moderaciones en serie
 const q = [];
 let busy = false;
 
@@ -83,10 +102,11 @@ async function drain() {
   busy = true;
   while (q.length) {
     const job = q.shift();
-    await processModeration(job).catch(()=>{});
+    await processModeration(job).catch(() => {});
   }
   busy = false;
 }
+
 function queueModeration(id, webPath) {
   console.log('[moderation] queued', { id, webPath, uploadsRoot });
   q.push({ id, webPath });
