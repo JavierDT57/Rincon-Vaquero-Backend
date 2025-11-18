@@ -15,6 +15,8 @@ const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
 
+require('./models/Producto').init();
+
 // ===== CORS =====
 const FRONT_ORIGIN = process.env.FRONT_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5173';
 app.use(helmet({ crossOriginResourcePolicy: false }));
