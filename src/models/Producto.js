@@ -1,4 +1,3 @@
-// src/models/Producto.js
 const db = require('../config/db');
 
 const Producto = {
@@ -12,6 +11,7 @@ const Producto = {
         categoria TEXT,
         stock INTEGER NOT NULL DEFAULT 0,
         ubicacion TEXT,
+        telefono TEXT,
         user_id INTEGER,
         status TEXT NOT NULL DEFAULT 'pending'
       )
@@ -28,6 +28,7 @@ const Producto = {
       if (!cols.includes('categoria')) alters.push(`ALTER TABLE productos ADD COLUMN categoria TEXT`);
       if (!cols.includes('stock')) alters.push(`ALTER TABLE productos ADD COLUMN stock INTEGER NOT NULL DEFAULT 0`);
       if (!cols.includes('ubicacion')) alters.push(`ALTER TABLE productos ADD COLUMN ubicacion TEXT`);
+      if (!cols.includes('telefono')) alters.push(`ALTER TABLE productos ADD COLUMN telefono TEXT`);
 
       if (alters.length) {
         db.exec(alters.join(';\n') + ';', (e2) => {
@@ -38,13 +39,13 @@ const Producto = {
     });
   },
 
-  create: ({ userId, nombre, imagenurl, precio, categoria, stock, ubicacion }) => {
+  create: ({ userId, nombre, imagenurl, precio, categoria, stock, ubicacion, telefono }) => {
     return new Promise((resolve, reject) => {
       db.run(
         `INSERT INTO productos 
-         (user_id, nombre, imagen_url, precio, categoria, stock, ubicacion, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
-        [userId, nombre, imagenurl, precio, categoria, stock, ubicacion],
+         (user_id, nombre, imagen_url, precio, categoria, stock, ubicacion, telefono, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        [userId, nombre, imagenurl, precio, categoria, stock, ubicacion, telefono],
         function (err) {
           if (err) return reject(err);
           resolve({ id: this.lastID });
@@ -57,7 +58,7 @@ const Producto = {
     return new Promise((resolve, reject) => {
       db.all(
         `SELECT id, user_id AS userId, nombre, imagen_url AS imagenurl,
-                precio, categoria, stock, ubicacion, status
+                precio, categoria, stock, ubicacion, telefono, status
          FROM productos
          WHERE status = ?
          ORDER BY id DESC`,
@@ -71,7 +72,7 @@ const Producto = {
     return new Promise((resolve, reject) => {
       db.all(
         `SELECT id, user_id AS userId, nombre, imagen_url AS imagenurl,
-                precio, categoria, stock, ubicacion, status
+                precio, categoria, stock, ubicacion, telefono, status
          FROM productos
          ORDER BY id DESC`,
         [],
@@ -84,7 +85,7 @@ const Producto = {
     return new Promise((resolve, reject) => {
       db.all(
         `SELECT id, user_id AS userId, nombre, imagen_url AS imagenurl,
-                precio, categoria, stock, ubicacion, status
+                precio, categoria, stock, ubicacion, telefono, status
          FROM productos
          WHERE user_id = ?
          ORDER BY id DESC`,
@@ -98,7 +99,7 @@ const Producto = {
     return new Promise((resolve, reject) => {
       db.get(
         `SELECT id, user_id AS userId, nombre, imagen_url AS imagenurl,
-                precio, categoria, stock, ubicacion, status
+                precio, categoria, stock, ubicacion, telefono, status
          FROM productos
          WHERE id = ?`,
         [id],
@@ -116,6 +117,7 @@ const Producto = {
         categoria: 'categoria',
         stock: 'stock',
         ubicacion: 'ubicacion',
+        telefono: 'telefono',
         status: 'status',
       };
 
