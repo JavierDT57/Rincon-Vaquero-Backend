@@ -1,6 +1,7 @@
 const db = require('../config/db');
 
 const Producto = {
+
   init: () => {
     db.run(`
       CREATE TABLE IF NOT EXISTS productos (
@@ -16,27 +17,6 @@ const Producto = {
         status TEXT NOT NULL DEFAULT 'pending'
       )
     `);
-
-    db.all(`PRAGMA table_info(productos)`, (err, rows) => {
-      if (err || !Array.isArray(rows)) return;
-      const cols = rows.map(r => r.name);
-      const alters = [];
-
-      if (!cols.includes('user_id')) alters.push(`ALTER TABLE productos ADD COLUMN user_id INTEGER`);
-      if (!cols.includes('status')) alters.push(`ALTER TABLE productos ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'`);
-      if (!cols.includes('imagen_url')) alters.push(`ALTER TABLE productos ADD COLUMN imagen_url TEXT`);
-      if (!cols.includes('categoria')) alters.push(`ALTER TABLE productos ADD COLUMN categoria TEXT`);
-      if (!cols.includes('stock')) alters.push(`ALTER TABLE productos ADD COLUMN stock INTEGER NOT NULL DEFAULT 0`);
-      if (!cols.includes('ubicacion')) alters.push(`ALTER TABLE productos ADD COLUMN ubicacion TEXT`);
-      if (!cols.includes('telefono')) alters.push(`ALTER TABLE productos ADD COLUMN telefono TEXT`);
-
-      if (alters.length) {
-        db.exec(alters.join(';\n') + ';', (e2) => {
-          if (e2) console.error('ALTER productos:', e2);
-          db.run(`UPDATE productos SET status='approved' WHERE status IS NULL OR status=''`, () => {});
-        });
-      }
-    });
   },
 
   create: ({ userId, nombre, imagenurl, precio, categoria, stock, ubicacion, telefono }) => {

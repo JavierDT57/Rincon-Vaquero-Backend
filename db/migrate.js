@@ -1,4 +1,3 @@
-// src/db/migrate.js
 const db = require('../src/config/db');
 
 function run(sql) {
@@ -22,6 +21,7 @@ function serialize(sqls) {
 
 async function migrate() {
   const SQL = [
+
     // ==== USERS ====
     `CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,6 +71,23 @@ async function migrate() {
       updatedAt DATETIME
     );`,
 
+// ==== PRODUCTOS ====
+`CREATE TABLE IF NOT EXISTS productos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nombre TEXT NOT NULL,
+  imagen_url TEXT,
+  precio REAL NOT NULL,
+  categoria TEXT,
+  stock INTEGER NOT NULL DEFAULT 0,
+  ubicacion TEXT,
+  telefono TEXT,
+  user_id INTEGER,
+  status TEXT NOT NULL DEFAULT 'pending',
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updatedAt DATETIME,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);`,
+
     // ==== DASHBOARD ====
     `CREATE TABLE IF NOT EXISTS dashboard_atomicas (
       slug TEXT PRIMARY KEY,
@@ -78,6 +95,7 @@ async function migrate() {
       tipo TEXT DEFAULT 'numero',
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );`,
+
   ];
 
   await serialize(SQL);

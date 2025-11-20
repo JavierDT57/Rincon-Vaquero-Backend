@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const Producto = require('../models/Producto');
 
-Producto.init();
 const uploadsDir = path.resolve(__dirname, '../../uploads/tienda');
 fs.mkdirSync(uploadsDir, { recursive: true });
 
