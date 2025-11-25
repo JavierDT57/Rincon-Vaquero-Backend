@@ -24,21 +24,27 @@ require("./models/Producto").init();
 
 const isProd = process.env.NODE_ENV === "production";
 
-const FRONT_ORIGIN =
-  process.env.FRONT_ORIGIN ||
-  process.env.FRONTEND_URL ||
-  (isProd
-    ? "https://rinconvaquero.org"
-    : "http://localhost:5173");
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://rinconvaquero.org",
+  "https://www.rinconvaquero.org",
+  "https://rincon-vaquero-frontend.pages.dev"
+];
 
-app.use(
-  cors({
-    origin: FRONT_ORIGIN,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
-  })
-);
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // para Postman y Node
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.log("Origen bloqueado por CORS:", origin);
+    return callback(new Error("No autorizado por CORS"), false);
+  },
+  credentials: true,
+  methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 
 // Seguridad básica sin bloquear imágenes/recursos
 app.use(
