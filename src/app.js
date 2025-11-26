@@ -151,13 +151,4 @@ app.use(errorHandler);
 // =======================================================
 module.exports = app;
 
-// =======================================================
-// Auto-arranque LOCAL / Render
-// =======================================================
-if (require.main === module) {
-  require("dotenv").config();
-  const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () =>
-    console.log(`Servidor escuchando en puerto ${PORT}`)
-  );
-}
+
