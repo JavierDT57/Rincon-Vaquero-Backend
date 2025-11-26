@@ -24,16 +24,11 @@ require("./models/Producto").init();
 
 const isProd = process.env.NODE_ENV === "production";
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://rinconvaquero.org",
-  "https://www.rinconvaquero.org",
-  "https://rincon-vaquero-frontend.pages.dev"
-];
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",");
 
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true); 
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
@@ -41,8 +36,8 @@ app.use(cors({
     return callback(new Error("No autorizado por CORS"), false);
   },
   credentials: true,
-  methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"]
 }));
 
 
