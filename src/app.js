@@ -33,7 +33,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // para Postman y Node
+    if (!origin) return callback(null, true); 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
